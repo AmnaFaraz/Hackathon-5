@@ -30,7 +30,7 @@ interface FormData {
 }
 
 export default function SupportForm({
-  apiEndpoint = "/api/support/submit",
+  apiEndpoint = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/support/submit",
 }: {
   apiEndpoint?: string;
 }) {
