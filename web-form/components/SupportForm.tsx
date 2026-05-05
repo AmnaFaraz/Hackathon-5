@@ -236,9 +236,9 @@ export default function SupportForm({
           )}
         </button>
 
-        <p className="text-center text-xs text-gray-400">
-          By submitting, you agree to our <a href="#" className="underline">Privacy Policy</a>.
-          Our AI FTE will respond within minutes.
+        <p className="text-center text-sm text-gray-500">
+          By submitting, you agree to be contacted by our AI support team.
+          All conversations are handled securely and confidentially.
         </p>
       </form>
     </div>
