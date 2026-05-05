@@ -6,9 +6,11 @@
 ![Hackathon](https://img.shields.io/badge/Panaversity-Hackathon%205-orange)
 
 ## Live Links
-- 🌐 Web Support Form: https://hackathon-5-web-form.vercel.app
-- 📦 GitHub Repository: https://github.com/AmnaFaraz/Hackathon-5
-- 📖 API Documentation: http://localhost:8000/docs (run locally)
+
+- 🌐 **Web Support Form:** https://hackathon-5-web-form.vercel.app
+- 📦 **GitHub Repository:** https://github.com/AmnaFaraz/Hackathon-5
+- 📖 **API Docs (local):** http://localhost:8000/docs — run backend locally to access
+- 🧪 **Test Report:** See `FINAL_TEST_REPORT.md` for full test results
 
 # CloudFlow Customer Success AI FTE
 
@@ -25,16 +27,95 @@ The CloudFlow Customer Success AI FTE is a production-grade autonomous agent des
 - **Next.js Web Form:** Premium frontend portal for structured customer submissions.
 
 ## Quick Start
-1. Clone this repository.
-2. Copy `.env.example` to `.env` and fill in your credentials.
-3. Start the local infrastructure:
-   ```bash
-   docker-compose -f production/docker-compose.yml up
-   ```
-4. Verify the system health:
-   ```bash
-   curl http://localhost:8000/health
-   ```
+
+### Prerequisites
+- Python 3.13+
+- Node.js 18+
+- Docker Desktop (running)
+- PostgreSQL client
+
+### 1. Clone & Configure
+```bash
+git clone https://github.com/AmnaFaraz/Hackathon-5.git
+cd Hackathon-5
+cp .env.example .env
+# Open .env and fill in your credentials before proceeding
+```
+
+### 2. Start Local Infrastructure
+```bash
+docker-compose -f production/docker-compose.yml up -d
+```
+Wait 30 seconds for Kafka and PostgreSQL to initialize.
+
+### 3. Apply Database Schema
+```bash
+psql $DATABASE_URL -f production/database/schema.sql
+```
+
+### 4. Seed the Knowledge Base
+This step is required — without it, the vector search returns empty results.
+```bash
+python production/database/seed_knowledge_base.py
+```
+Expected output: `Seeded X knowledge base entries successfully.`
+
+### 5. Verify System Health
+```bash
+curl http://localhost:8000/health
+```
+Expected response:
+```json
+{
+  "status": "healthy",
+  "channels": {
+    "email": "active",
+    "whatsapp": "active",
+    "web_form": "active"
+  }
+}
+```
+
+### 6. Run the Web Support Form (locally)
+```bash
+cd web-form
+npm install
+npm run dev
+```
+Visit http://localhost:3000 to submit a test ticket.
+
+### 7. Run the Test Suite
+```bash
+# Unit tests
+pytest production/tests/test_agent.py -v
+
+# Channel integration tests
+pytest production/tests/test_channels.py -v
+
+# Full multi-channel E2E tests
+pytest production/tests/test_multichannel_e2e.py -v
+
+# Load test (requires running server)
+locust -f production/tests/load_test.py --host=http://localhost:8000
+
+# 24-Hour continuous operation simulation
+python production/tests/run_24hr_test.py
+```
+
+### 8. Kubernetes Deployment
+```bash
+kubectl apply -f production/k8s/namespace.yaml
+kubectl apply -f production/k8s/configmap.yaml
+kubectl apply -f production/k8s/secrets.yaml
+kubectl apply -f production/k8s/deployment-api.yaml
+kubectl apply -f production/k8s/deployment-worker.yaml
+kubectl apply -f production/k8s/service.yaml
+kubectl apply -f production/k8s/ingress.yaml
+kubectl apply -f production/k8s/hpa.yaml
+
+# Verify all pods are running
+kubectl get pods -n customer-success-fte
+```
 
 ## Channel Setup
 
@@ -59,6 +140,10 @@ The CloudFlow Customer Success AI FTE is a production-grade autonomous agent des
 - Visit `http://localhost:3000` to submit a test ticket.
 
 ## API Endpoints
+
+> **Local:** http://localhost:8000/docs  
+> **Note:** Deploy backend to Railway or Render and update this URL 
+> with your live endpoint after deployment.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | System health and channel status. |
