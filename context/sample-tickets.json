@@ -1,0 +1,12 @@
+[
+  {"id": 1, "channel": "email", "customer": "ali@example.com", "message": "How do I reset my password? I've been locked out for 2 hours.", "category": "technical"},
+  {"id": 2, "channel": "whatsapp", "customer": "+923001234567", "message": "app not working", "category": "technical"},
+  {"id": 3, "channel": "web_form", "customer": "sara@company.com", "message": "I need to add 5 new team members to our Pro plan. What are the steps?", "category": "general"},
+  {"id": 4, "channel": "email", "customer": "angry@client.com", "message": "This is RIDICULOUS. Your app lost all my data. I want a refund NOW.", "category": "billing"},
+  {"id": 5, "channel": "whatsapp", "customer": "+923009876543", "message": "how much does enterprise cost?", "category": "billing"},
+  {"id": 6, "channel": "web_form", "customer": "dev@startup.io", "message": "My API key is hitting rate limits at 80 requests. I'm on Pro plan. Is this a bug?", "category": "technical"},
+  {"id": 7, "channel": "email", "customer": "cto@bigcorp.com", "message": "We need a custom integration with our internal tool. Can we discuss?", "category": "general"},
+  {"id": 8, "channel": "whatsapp", "customer": "+923005551234", "message": "human", "category": "escalation"},
+  {"id": 9, "channel": "web_form", "customer": "newuser@gmail.com", "message": "I just signed up but cannot find where to download the mobile app.", "category": "general"},
+  {"id": 10, "channel": "email", "customer": "legal@firm.com", "message": "My client is considering legal action regarding data breach. Please advise.", "category": "legal"}
+]

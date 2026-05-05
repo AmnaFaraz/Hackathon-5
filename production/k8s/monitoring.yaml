@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fte-monitoring
+  namespace: customer-success-fte
+data:
+  alerts.yml: |
+    groups:
+    - name: fte-alerts
+      rules:
+      - alert: HighEscalationRate
+        expr: escalation_rate > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Escalation rate above 25%"
+      - alert: HighLatency
+        expr: p95_response_time_ms > 3000
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P95 latency above 3 seconds"
+      - alert: APIPodsDown
+        expr: available_api_pods < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No API pods available"
+      - alert: KafkaConsumerLag
+        expr: kafka_consumer_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka consumer falling behind"
