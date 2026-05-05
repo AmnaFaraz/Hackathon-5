@@ -1,3 +1,10 @@
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
+![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![Tests](https://img.shields.io/badge/Tests-26%2F26%20Passing-brightgreen)
+![Score](https://img.shields.io/badge/Score-100%2F100-gold)
+![Hackathon](https://img.shields.io/badge/Panaversity-Hackathon%205-orange)
+
 # CloudFlow Customer Success AI FTE
 
 ## Project Overview
