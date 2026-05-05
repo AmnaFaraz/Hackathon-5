@@ -7,7 +7,7 @@ export default function Home() {
         <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">
           CloudFlow Support Portal
         </h1>
-        <SupportForm apiEndpoint="http://localhost:8000/support/submit" />
+        <SupportForm apiEndpoint={process.env.NEXT_PUBLIC_API_URL ? `${process.env.NEXT_PUBLIC_API_URL}/support/submit` : "http://localhost:8000/support/submit"} />
       </div>
     </main>
   );
