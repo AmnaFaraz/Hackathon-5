@@ -1,127 +1,189 @@
+"""
+MCP Server — CloudFlow Customer Success FTE
+Exercise 1.4 Implementation: Exposes agent capabilities as MCP tools.
+Connects to the production agent tools defined in production/agent/tools.py
+"""
+
+import sys
 import os
-import json
-import re
 
-# In-memory storage for the prototype
-tickets = {}
-customer_history = {
-    "ali@example.com": [{"id": 1, "issue": "Password login issue", "status": "resolved"}],
-    "angry@client.com": [{"id": 4, "issue": "Data loss complaint", "status": "open"}]
-}
-knowledge_base_path = os.path.join(os.path.dirname(__file__), "../context/product-docs.md")
+# Add production path so we can import agent tools
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'production'))
 
-def search_knowledge_base(query: str) -> str:
+from mcp.server import Server
+from mcp.types import Tool, TextContent
+from enum import Enum
+
+
+class Channel(str, Enum):
+    EMAIL = "email"
+    WHATSAPP = "whatsapp"
+    WEB_FORM = "web_form"
+
+
+server = Server("cloudflow-customer-success-fte")
+
+
+@server.tool("search_knowledge_base")
+async def search_knowledge_base(query: str, max_results: int = 5) -> str:
     """
-    Searches the CloudFlow product documentation for relevant information based on the query.
-    
+    Search product documentation for relevant information.
+    Use when customer asks about product features or needs technical help.
     Args:
-        query: The search term or question from the customer.
+        query: The search query string
+        max_results: Maximum number of results to return (default 5)
     Returns:
-        The most relevant section of the documentation or a default message if not found.
+        Formatted search results with relevance scores
     """
-    if not os.path.exists(knowledge_base_path):
-        return "Knowledge base unavailable."
-        
-    with open(knowledge_base_path, "r", encoding="utf-8") as f:
-        docs = f.read()
-        
-    sections = re.split(r'(?m)^## ', docs)
-    keywords = query.lower().split()
-    
-    best_match = ""
-    max_matches = 0
-    
-    for section in sections:
-        if not section.strip(): continue
-        match_count = sum(1 for kw in keywords if kw in section.lower())
-        if match_count > max_matches:
-            max_matches = match_count
-            best_match = section.strip()
-            
-    if max_matches > 0:
-        return best_match.replace("→", "->")
-    return "No relevant documentation found."
+    from agent.tools import search_knowledge_base as prod_search
+    from agent.tools import KnowledgeSearchInput
+    result = await prod_search(KnowledgeSearchInput(
+        query=query,
+        max_results=max_results
+    ))
+    return result
 
-def create_ticket(customer_id: str, issue: str, priority: str, channel: str) -> str:
+
+@server.tool("create_ticket")
+async def create_ticket(
+    customer_id: str,
+    issue: str,
+    priority: str,
+    channel: str
+) -> str:
     """
-    Creates a new support ticket in the system.
-    
+    Create a support ticket in the CRM system with channel tracking.
+    ALWAYS call this at the start of every customer interaction.
     Args:
-        customer_id: Email or phone number of the customer.
-        issue: Brief description of the problem.
-        priority: Low, Medium, High, or Urgent.
-        channel: email, whatsapp, or web_form.
+        customer_id: Unique identifier for the customer
+        issue: Description of the customer's issue
+        priority: Ticket priority — low, medium, or high
+        channel: Source channel — email, whatsapp, or web_form
     Returns:
-        The ID of the newly created ticket.
+        Created ticket ID
     """
-    ticket_id = f"TICK-{len(tickets) + 1001}"
-    tickets[ticket_id] = {
-        "customer_id": customer_id,
-        "issue": issue,
-        "priority": priority,
-        "channel": channel,
-        "status": "open",
-        "responses": []
-    }
-    
-    # Update customer history
-    if customer_id not in customer_history:
-        customer_history[customer_id] = []
-    customer_history[customer_id].append({"id": ticket_id, "issue": issue, "status": "open"})
-    
-    return ticket_id
+    from agent.tools import create_ticket as prod_create
+    from agent.tools import TicketInput
+    result = await prod_create(TicketInput(
+        customer_id=customer_id,
+        issue=issue,
+        priority=priority,
+        channel=Channel(channel)
+    ))
+    return result
 
-def get_customer_history(customer_id: str) -> str:
+
+@server.tool("get_customer_history")
+async def get_customer_history(customer_id: str) -> str:
     """
-    Retrieves the past support history for a specific customer.
-    
+    Get customer interaction history across ALL channels.
+    Use this to understand context from previous conversations
+    even if they happened on a different channel.
     Args:
-        customer_id: The identifier for the customer (email/phone).
+        customer_id: Unique identifier for the customer
     Returns:
-        A JSON string containing the list of previous tickets and their statuses.
+        Formatted history of all past interactions
     """
-    history = customer_history.get(customer_id, [])
-    return json.dumps(history, indent=2)
+    from agent.tools import get_customer_history as prod_history
+    result = await prod_history(customer_id)
+    return result
 
-def escalate_to_human(ticket_id: str, reason: str) -> str:
+
+@server.tool("escalate_to_human")
+async def escalate_to_human(
+    ticket_id: str,
+    reason: str,
+    urgency: str = "normal"
+) -> str:
     """
-    Escalates an existing ticket to a human agent.
-    
+    Escalate conversation to human support team.
+    Use when: pricing questions, refund requests, legal mentions,
+    negative sentiment, or customer explicitly asks for human help.
     Args:
-        ticket_id: The ID of the ticket to escalate.
-        reason: The reason for escalation (e.g., 'sentiment_low', 'legal_threat').
+        ticket_id: The ticket to escalate
+        reason: Clear reason for escalation
+        urgency: normal or urgent
     Returns:
-        A confirmation message of the escalation.
+        Escalation confirmation with reference ID
     """
-    if ticket_id in tickets:
-        tickets[ticket_id]["status"] = "escalated"
-        tickets[ticket_id]["escalation_reason"] = reason
-        return f"Ticket {ticket_id} has been escalated to a human agent. Reason: {reason}"
-    return f"Error: Ticket {ticket_id} not found."
+    from agent.tools import escalate_to_human as prod_escalate
+    from agent.tools import EscalationInput
+    result = await prod_escalate(EscalationInput(
+        ticket_id=ticket_id,
+        reason=reason,
+        urgency=urgency
+    ))
+    return result
 
-def send_response(ticket_id: str, message: str, channel: str) -> str:
+
+@server.tool("send_response")
+async def send_response(
+    ticket_id: str,
+    message: str,
+    channel: str
+) -> str:
     """
-    Sends a response message back to the customer through the specified channel.
-    
+    Send response to customer via their preferred channel.
+    Response is automatically formatted for channel constraints.
+    Email: formal with greeting and signature.
+    WhatsApp: concise under 300 characters.
+    Web: semi-formal and readable.
+    ALWAYS use this tool to reply — never respond directly.
     Args:
-        ticket_id: The ID of the ticket.
-        message: The message content to send.
-        channel: The channel to use for sending.
+        ticket_id: The ticket being responded to
+        message: The response message content
+        channel: Target channel — email, whatsapp, or web_form
     Returns:
-        A status message indicating success or failure.
+        Delivery status confirmation
     """
-    if ticket_id in tickets:
-        tickets[ticket_id]["responses"].append({"message": message, "channel": channel})
-        # In a real system, this would call an API (SendGrid, Twilio, etc.)
-        return f"Response sent to {tickets[ticket_id]['customer_id']} via {channel}."
-    return f"Error: Ticket {ticket_id} not found."
+    from agent.tools import send_response as prod_send
+    from agent.tools import ResponseInput
+    result = await prod_send(ResponseInput(
+        ticket_id=ticket_id,
+        message=message,
+        channel=Channel(channel)
+    ))
+    return result
 
-# Mock server execution for testing
+
+@server.tool("analyze_sentiment")
+async def analyze_sentiment(message: str) -> str:
+    """
+    Analyze customer message sentiment.
+    Use on every incoming message to detect frustration early.
+    Args:
+        message: The customer message text to analyze
+    Returns:
+        Sentiment score between 0.0 (very negative) and 1.0 (very positive)
+        and confidence level
+    """
+    # Lightweight sentiment check — production uses ML model
+    negative_keywords = [
+        "angry", "furious", "terrible", "broken", "useless",
+        "worst", "hate", "ridiculous", "lawsuit", "refund",
+        "lawyer", "cancel", "scam", "fraud"
+    ]
+    positive_keywords = [
+        "thank", "great", "excellent", "happy", "love",
+        "perfect", "amazing", "helpful", "wonderful"
+    ]
+
+    message_lower = message.lower()
+    neg_count = sum(1 for w in negative_keywords if w in message_lower)
+    pos_count = sum(1 for w in positive_keywords if w in message_lower)
+
+    if neg_count > pos_count:
+        score = max(0.1, 0.5 - (neg_count * 0.1))
+        label = "negative"
+    elif pos_count > neg_count:
+        score = min(0.95, 0.6 + (pos_count * 0.1))
+        label = "positive"
+    else:
+        score = 0.5
+        label = "neutral"
+
+    return f"sentiment: {label} | score: {score:.2f} | escalate: {score < 0.3}"
+
+
 if __name__ == "__main__":
-    print("MCP Server Tools Loaded (Mock Mode)")
-    print(f"Test Search: {search_knowledge_base('reset password')[:50]}...")
-    tid = create_ticket("user@test.com", "App is crashing", "High", "whatsapp")
-    print(f"Created Ticket: {tid}")
-    print(f"History: {get_customer_history('user@test.com')}")
-    print(escalate_to_human(tid, "Sentiment low"))
-    print(send_response(tid, "We are looking into it.", "whatsapp"))
+    server.run()

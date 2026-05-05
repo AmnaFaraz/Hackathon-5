@@ -31,3 +31,22 @@
 - **Accuracy:** > 85% correct retrieval from product docs.
 - **Escalation Accuracy:** 100% for defined triggers.
 - **Sentiment Detection:** > 90% alignment with manual labels.
+
+## MCP Server Implementation (Exercise 1.4)
+
+**File:** `src/mcp_server.py`  
+**Tools Exposed:** 6 tools  
+
+| Tool | Purpose |
+|------|---------|
+| search_knowledge_base | Search pgvector knowledge base |
+| create_ticket | Create CRM ticket with channel metadata |
+| get_customer_history | Cross-channel history lookup |
+| escalate_to_human | Human handoff with reason tracking |
+| send_response | Channel-aware response delivery |
+| analyze_sentiment | Real-time sentiment scoring |
+
+**Architecture Decision:** MCP server wraps the production tools from 
+`production/agent/tools.py` so the same business logic is reused 
+in both incubation and production phases. This demonstrates the 
+Agent Factory paradigm — General Agent (MCP) builds Custom Agent (OpenAI SDK).
