@@ -5,6 +5,11 @@
 ![Score](https://img.shields.io/badge/Score-100%2F100-gold)
 ![Hackathon](https://img.shields.io/badge/Panaversity-Hackathon%205-orange)
 
+## Live Links
+- 🌐 Web Support Form: https://hackathon-5-web-form.vercel.app
+- 📦 GitHub Repository: https://github.com/AmnaFaraz/Hackathon-5
+- 📖 API Documentation: http://localhost:8000/docs (run locally)
+
 # CloudFlow Customer Success AI FTE
 
 ## Project Overview
