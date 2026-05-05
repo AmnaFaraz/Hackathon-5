@@ -1,3 +1,17 @@
+# Windows Binaries (never commit)
+*.exe
+*.dll
+*.msi
+kubectl
+kubectl.exe
+kubectl_v2.exe
+kubectl_*.exe
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
 # Environment
 .env
 *.env
