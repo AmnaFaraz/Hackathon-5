@@ -2,23 +2,6 @@
 
 import React, { useState } from "react";
 
-interface FormData {
-  name: string;
-  email: string;
-  subject: string;
-  category: string;
-  priority: string;
-  message: string;
-}
-
-interface SubmitResponse {
-  ticket_id: string;
-  message: string;
-  estimated_response_time: string;
-}
-
-type Status = "idle" | "submitting" | "success" | "error";
-
 const CATEGORIES = [
   { value: "general", label: "General Question" },
   { value: "technical", label: "Technical Support" },
@@ -28,15 +11,28 @@ const CATEGORIES = [
 ];
 
 const PRIORITIES = [
-  { value: "low", label: "Low - Not urgent" },
-  { value: "medium", label: "Medium - Need help soon" },
-  { value: "high", label: "High - Urgent issue" },
+  { value: "low", label: "Low — Not urgent" },
+  { value: "medium", label: "Medium — Need help soon" },
+  { value: "high", label: "High — Urgent issue" },
 ];
 
-export default function SupportForm({ 
-  apiEndpoint = "http://localhost:8000/support/submit" 
-}: { 
-  apiEndpoint?: string 
+const MAX_MESSAGE_LENGTH = 1000;
+
+type Status = "idle" | "submitting" | "success" | "error";
+
+interface FormData {
+  name: string;
+  email: string;
+  subject: string;
+  category: string;
+  priority: string;
+  message: string;
+}
+
+export default function SupportForm({
+  apiEndpoint = "/api/support/submit",
+}: {
+  apiEndpoint?: string;
 }) {
   const [formData, setFormData] = useState<FormData>({
     name: "",
@@ -49,34 +45,49 @@ export default function SupportForm({
 
   const [status, setStatus] = useState<Status>("idle");
   const [ticketId, setTicketId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Partial<FormData>>({});
+
+  const charsRemaining = MAX_MESSAGE_LENGTH - formData.message.length;
+  const isOverLimit = charsRemaining < 0;
+
+  const validate = (): boolean => {
+    const newErrors: Partial<FormData> = {};
+
+    if (!formData.name.trim() || formData.name.trim().length < 2)
+      newErrors.name = "Name must be at least 2 characters.";
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
+      newErrors.email = "Please enter a valid email address.";
+
+    if (!formData.subject.trim() || formData.subject.trim().length < 5)
+      newErrors.subject = "Subject must be at least 5 characters.";
+
+    if (!formData.message.trim() || formData.message.trim().length < 10)
+      newErrors.message = "Please describe your issue in more detail.";
+
+    if (isOverLimit)
+      newErrors.message = `Message is ${Math.abs(charsRemaining)} characters over the limit.`;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const validateForm = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return (
-      formData.name.length >= 2 &&
-      emailRegex.test(formData.email) &&
-      formData.subject.length >= 5 &&
-      formData.message.length >= 10
-    );
+    if (errors[name as keyof FormData]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) {
-      setError("Please fill all fields correctly. Name min 2 chars, message min 10.");
-      return;
-    }
-
+    if (!validate()) return;
     setStatus("submitting");
-    setError(null);
 
     try {
       const response = await fetch(apiEndpoint, {
@@ -85,162 +96,320 @@ export default function SupportForm({
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) throw new Error("Submission failed");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Server error: ${response.status}`);
+      }
 
-      const data: SubmitResponse = await response.json();
+      const data = await response.json();
       setTicketId(data.ticket_id);
       setStatus("success");
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
+    } catch (err) {
       setStatus("error");
     }
   };
 
+  /* ── SUCCESS STATE ─────────────────────────────────────── */
   if (status === "success") {
     return (
-      <div className="bg-white p-8 rounded-xl shadow-lg text-center animate-in fade-in zoom-in duration-300">
-        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-          <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg p-10 text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg
+              className="w-10 h-10 text-green-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Request Submitted!
+          </h2>
+          <p className="text-gray-500 mb-6">
+            Our AI support agent will respond to your email shortly.
+          </p>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">
+              Your Ticket ID
+            </p>
+            <p className="text-lg font-mono font-semibold text-blue-600">
+              {ticketId}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-8">
+            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            AI Agent is processing your request
+          </div>
+
+          <button
+            onClick={() => {
+              setStatus("idle");
+              setTicketId(null);
+              setFormData({
+                name: "",
+                email: "",
+                subject: "",
+                category: "general",
+                priority: "medium",
+                message: "",
+              });
+              setErrors({});
+            }}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 
+                       text-white font-medium rounded-xl transition-colors duration-200"
+          >
+            Submit Another Request
+          </button>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
-        <p className="text-gray-600 mb-6">Your request has been priority-queued for our AI agent.</p>
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
-          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Ticket Reference</p>
-          <code className="text-lg font-mono text-blue-600 break-all">{ticketId}</code>
-        </div>
-        <button
-          onClick={() => setStatus("idle")}
-          className="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-200"
-        >
-          Submit Another Request
-        </button>
       </div>
     );
   }
 
-  const inputClasses = "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition";
-
+  /* ── MAIN FORM ─────────────────────────────────────────── */
   return (
-    <div className="bg-white p-8 rounded-xl shadow-lg">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              name="name"
-              required
-              value={formData.name}
-              onChange={handleChange}
-              className={inputClasses}
-              placeholder="Your Name"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              className={inputClasses}
-              placeholder="name@company.com"
-            />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg overflow-hidden">
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 
+                     9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 
+                     11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">CloudFlow Support</h1>
+              <p className="text-blue-100 text-sm">AI-powered · 24/7 · Instant response</p>
+            </div>
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-          <input
-            type="text"
-            name="subject"
-            required
-            value={formData.subject}
-            onChange={handleChange}
-            className={inputClasses}
-            placeholder="What do you need help with?"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={handleChange}
-              className={inputClasses}
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat.value} value={cat.value}>{cat.label}</option>
-              ))}
-            </select>
+        {/* Error Banner */}
+        {status === "error" && (
+          <div className="mx-8 mt-6 p-4 bg-red-50 border border-red-200 
+                          rounded-xl flex items-start gap-3">
+            <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none"
+              stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-red-700">
+                Submission failed
+              </p>
+              <p className="text-sm text-red-600 mt-0.5">
+                Something went wrong on our end. Please try again in a moment.
+                If this keeps happening, email us directly at support@cloudflow.ai
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-            <select
-              name="priority"
-              value={formData.priority}
-              onChange={handleChange}
-              className={inputClasses}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">Message</label>
-            <span className={`text-xs ${formData.message.length > 1000 ? 'text-red-500' : 'text-gray-400'}`}>
-              {formData.message.length}/1000
-            </span>
-          </div>
-          <textarea
-            name="message"
-            rows={4}
-            required
-            value={formData.message}
-            onChange={handleChange}
-            className={`${inputClasses} resize-none`}
-            placeholder="Tell us about the issue..."
-          ></textarea>
-        </div>
-
-        {error && (
-          <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{error}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={status === "submitting"}
-          className={`w-full py-3 rounded-lg font-semibold text-white transition duration-200 flex items-center justify-center ${
-            status === "submitting" ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-md"
-          }`}
-        >
-          {status === "submitting" ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Processing...
-            </>
-          ) : (
-            "Submit Request"
-          )}
-        </button>
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-8 space-y-5" noValidate>
 
-        <p className="text-center text-sm text-gray-500">
-          By submitting, you agree to be contacted by our AI support team.
-          All conversations are handled securely and confidentially.
-        </p>
-      </form>
+          {/* Name + Email */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Amna Faraz"
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm
+                  transition-colors duration-150 outline-none
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                  ${errors.name
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-200 bg-gray-50 hover:border-gray-300"
+                  }`}
+              />
+              {errors.name && (
+                <p className="mt-1 text-xs text-red-500">{errors.name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Email Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="amna@example.com"
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm
+                  transition-colors duration-150 outline-none
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                  ${errors.email
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-200 bg-gray-50 hover:border-gray-300"
+                  }`}
+              />
+              {errors.email && (
+                <p className="mt-1 text-xs text-red-500">{errors.email}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Subject */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Subject <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="subject"
+              value={formData.subject}
+              onChange={handleChange}
+              placeholder="Brief description of your issue"
+              className={`w-full px-4 py-2.5 rounded-xl border text-sm
+                transition-colors duration-150 outline-none
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                ${errors.subject
+                  ? "border-red-400 bg-red-50"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300"
+                }`}
+            />
+            {errors.subject && (
+              <p className="mt-1 text-xs text-red-500">{errors.subject}</p>
+            )}
+          </div>
+
+          {/* Category + Priority */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="category"
+                value={formData.category}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 
+                           bg-gray-50 text-sm outline-none
+                           focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                           hover:border-gray-300 transition-colors duration-150"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Priority
+              </label>
+              <select
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200
+                           bg-gray-50 text-sm outline-none
+                           focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                           hover:border-gray-300 transition-colors duration-150"
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Message + Character Counter */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-700">
+                How can we help? <span className="text-red-500">*</span>
+              </label>
+              <span className={`text-xs font-mono tabular-nums ${
+                isOverLimit
+                  ? "text-red-500 font-semibold"
+                  : charsRemaining <= 100
+                  ? "text-amber-500"
+                  : "text-gray-400"
+              }`}>
+                {isOverLimit ? `${Math.abs(charsRemaining)} over limit` : `${charsRemaining} remaining`}
+              </span>
+            </div>
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleChange}
+              rows={6}
+              placeholder="Please describe your issue or question in detail. Include any error messages, steps to reproduce, or relevant context..."
+              className={`w-full px-4 py-3 rounded-xl border text-sm resize-none
+                transition-colors duration-150 outline-none
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                ${errors.message || isOverLimit
+                  ? "border-red-400 bg-red-50"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300"
+                }`}
+            />
+            {errors.message && (
+              <p className="mt-1 text-xs text-red-500">{errors.message}</p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={status === "submitting" || isOverLimit}
+            className={`w-full py-3 px-4 rounded-xl font-medium text-white
+              transition-all duration-200 flex items-center justify-center gap-2
+              ${status === "submitting" || isOverLimit
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 active:scale-[0.99] shadow-sm hover:shadow-md"
+              }`}
+          >
+            {status === "submitting" ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10"
+                    stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                Submit Support Request
+              </>
+            )}
+          </button>
+
+          {/* Footer note */}
+          <p className="text-center text-xs text-gray-400 pt-1">
+            By submitting, you agree to be contacted by our AI support team.
+            All conversations are handled securely and confidentially.
+          </p>
+        </form>
+      </div>
     </div>
   );
 }
