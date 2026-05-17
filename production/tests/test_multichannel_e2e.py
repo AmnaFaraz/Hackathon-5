@@ -1,10 +1,15 @@
 import pytest
-import asyncio
+import uuid
 from httpx import AsyncClient
 from datetime import datetime
 
+
+def unique_email(prefix: str = "test") -> str:
+    """Generate a unique email address to avoid DB constraint conflicts across test runs."""
+    return f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
+
+
 @pytest.fixture
-@pytest.mark.asyncio
 async def client():
     async with AsyncClient(base_url="http://localhost:8000", timeout=30.0) as ac:
         yield ac
@@ -14,7 +19,7 @@ class TestWebFormChannel:
     async def test_form_submission(self, client):
         payload = {
             "name": "Jane Doe",
-            "email": "jane@example.com",
+            "email": unique_email("jane"),
             "subject": "Login Issue",
             "category": "technical",
             "message": "I cannot log in to my account since this morning.",
@@ -41,17 +46,18 @@ class TestWebFormChannel:
 
     @pytest.mark.asyncio
     async def test_ticket_status_retrieval(self, client):
-        # First submit
+        # First submit with unique email
         payload = {
             "name": "Test User",
-            "email": "test@user.com",
-            "subject": "Status Check",
+            "email": unique_email("statuscheck"),
+            "subject": "Status Check Test",
             "category": "general",
             "message": "Checking my ticket status please."
         }
         sub_res = await client.post("/support/submit", json=payload)
+        assert sub_res.status_code == 200, f"Submit failed: {sub_res.text}"
         ticket_id = sub_res.json()["ticket_id"]
-        
+
         # Then get status
         response = await client.get(f"/support/ticket/{ticket_id}")
         assert response.status_code == 200
@@ -88,22 +94,22 @@ class TestWhatsAppChannel:
 class TestCrossChannelContinuity:
     @pytest.mark.asyncio
     async def test_customer_history_across_channels(self, client):
-        email = "crosschannel@example.com"
+        email = unique_email("crosschannel")
         # Submit via web form
-        await client.post("/support/submit", json={
+        submit_res = await client.post("/support/submit", json={
             "name": "Cross User",
             "email": email,
-            "subject": "History Test",
+            "subject": "History Test Request",
             "category": "general",
-            "message": "I am testing cross-channel lookup."
+            "message": "I am testing cross-channel lookup across channels."
         })
-        
-        # Look up customer
+        assert submit_res.status_code == 200, f"Submit failed: {submit_res.text}"
+
+        # Look up the customer that was just created
         response = await client.get(f"/customers/lookup?email={email}")
-        if response.status_code == 200:
-            data = response.json()
-            # This depends on DB state in the environment
-            assert "id" in data
+        assert response.status_code == 200, f"Customer lookup failed: {response.text}"
+        data = response.json()
+        assert "id" in data, f"Expected 'id' in response, got: {data}"
 
 class TestChannelMetrics:
     @pytest.mark.asyncio

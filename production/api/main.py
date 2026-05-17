@@ -1,6 +1,7 @@
 import uuid
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional, Dict
 from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
@@ -17,37 +18,44 @@ from production.database import queries
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- App Init ---
-
-app = FastAPI(
-    title="Customer Success FTE API",
-    description="24/7 AI-powered customer support across Email, WhatsApp, and Web",
-    version="2.0.0"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
-
 # --- Global Instances ---
 
 kafka_producer = FTEKafkaProducer()
 gmail_handler = GmailHandler(os.getenv("GMAIL_CREDENTIALS_PATH", "./context/gmail-credentials.json"))
 whatsapp_handler = WhatsAppHandler()
 
-# --- Lifecycle Hooks ---
 
-@app.on_event("startup")
-async def startup_event():
+# --- Lifespan (modern FastAPI pattern, replaces deprecated on_event) ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     await kafka_producer.start()
-
-@app.on_event("shutdown")
-async def shutdown_event():
+    logger.info("Application startup complete")
+    yield
+    # Shutdown
     await kafka_producer.stop()
+    logger.info("Application shutdown complete")
+
+
+# --- App Init ---
+
+app = FastAPI(
+    title="Customer Success FTE API",
+    description="24/7 AI-powered customer support across Email, WhatsApp, and Web",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# Allow all origins — restrict to your Vercel URL in production for extra security
+allow_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Routers ---
 
