@@ -11,9 +11,21 @@ logger = logging.getLogger(__name__)
 _pool = None
 
 async def get_db_pool():
-    """Singleton connection pool using env vars."""
+    """Singleton connection pool using env vars, bound to the running event loop."""
     global _pool
-    if _pool is None:
+    import asyncio
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    # Recreate the pool if it doesn't exist, has a different loop, or is closed
+    if _pool is None or (current_loop and getattr(_pool, "_loop", None) != current_loop) or getattr(_pool, "_closed", False):
+        if _pool is not None:
+            try:
+                await _pool.close()
+            except Exception:
+                pass
         try:
             _pool = await asyncpg.create_pool(
                 host=os.getenv("POSTGRES_HOST", "localhost"),

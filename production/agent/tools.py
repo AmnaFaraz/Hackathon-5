@@ -8,7 +8,7 @@ from production.database import queries
 from production.agent.formatters import format_for_channel
 from production.channels.gmail_handler import GmailHandler
 from production.channels.whatsapp_handler import WhatsAppHandler
-from production.kafka_mock import FTEKafkaProducer, TOPICS
+from production.kafka_client import FTEKafkaProducer, TOPICS
 
 # Setup logging
 logger = logging.getLogger(__name__)

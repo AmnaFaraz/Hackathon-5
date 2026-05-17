@@ -11,19 +11,18 @@ from fastapi import Request
 logger = logging.getLogger(__name__)
 
 
-def _try_init_twilio():
+def _init_twilio():
     """
-    Attempt to initialize real Twilio client from environment variables.
-    Returns (client, validator) or (None, None) if not configured.
+    Initialize real Twilio client from environment variables.
+    Raises ValueError if credentials are not configured.
     """
     account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
 
-    # Skip if placeholder values are still present
-    if not account_sid or account_sid in ("your_twilio_sid", "mock_sid"):
-        return None, None
-    if not auth_token or auth_token in ("your_twilio_token", "mock_token"):
-        return None, None
+    if not account_sid or account_sid in ("your_twilio_sid", "mock_sid", ""):
+        raise ValueError("TWILIO_ACCOUNT_SID not set or invalid!")
+    if not auth_token or auth_token in ("your_twilio_token", "mock_token", ""):
+        raise ValueError("TWILIO_AUTH_TOKEN not set or invalid!")
 
     try:
         from twilio.rest import Client
@@ -33,22 +32,17 @@ def _try_init_twilio():
         logger.info("Real Twilio WhatsApp handler initialized")
         return client, validator
     except Exception as e:
-        logger.warning(f"Twilio init failed — falling back to mock mode: {e}")
-        return None, None
+        logger.error(f"Twilio init failed: {e}")
+        raise
 
 
 class WhatsAppHandler:
     def __init__(self):
-        self.client, self.validator = _try_init_twilio()
-        self._mock = self.client is None
+        self.client, self.validator = _init_twilio()
         self.from_number = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
-        if self._mock:
-            logger.info("WhatsAppHandler running in mock mode (no valid Twilio credentials)")
 
     async def validate_webhook(self, request: Request) -> bool:
         """Validate incoming Twilio webhook signature."""
-        if self._mock:
-            return True  # Allow all in mock mode
         try:
             signature = request.headers.get("X-Twilio-Signature", "")
             url = str(request.url)
@@ -73,9 +67,6 @@ class WhatsAppHandler:
 
     async def send_message(self, to_phone: str, body: str) -> dict:
         """Send a WhatsApp message to a customer phone number."""
-        if self._mock:
-            logger.info(f"[MOCK] WhatsApp send to {to_phone}: {body[:80]}...")
-            return {"channel_message_id": "mock-sid", "delivery_status": "sent"}
         try:
             # Ensure proper whatsapp: prefix
             to = to_phone if to_phone.startswith("whatsapp:") else f"whatsapp:{to_phone}"

@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import datetime
 
-from production.kafka_mock import FTEKafkaProducer, FTEKafkaConsumer, TOPICS
+from production.kafka_client import FTEKafkaProducer, FTEKafkaConsumer, TOPICS
 from production.agent.customer_success_agent import run_agent
 from production.agent.sentiment import analyze_sentiment, should_escalate
 from production.agent.formatters import format_for_channel

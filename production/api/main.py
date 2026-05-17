@@ -11,18 +11,31 @@ from fastapi.responses import Response
 from production.channels.gmail_handler import GmailHandler
 from production.channels.whatsapp_handler import WhatsAppHandler
 from production.channels.web_form_handler import web_form_router
-from production.kafka_mock import FTEKafkaProducer, TOPICS
+from production.kafka_client import FTEKafkaProducer, TOPICS
 from production.database import queries
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Global Instances ---
+# --- Global Instances (Lazy Loaded) ---
 
 kafka_producer = FTEKafkaProducer()
-gmail_handler = GmailHandler(os.getenv("GMAIL_CREDENTIALS_PATH", "./context/gmail-credentials.json"))
-whatsapp_handler = WhatsAppHandler()
+
+_gmail_handler = None
+_whatsapp_handler = None
+
+def get_gmail_handler() -> GmailHandler:
+    global _gmail_handler
+    if _gmail_handler is None:
+        _gmail_handler = GmailHandler(os.getenv("GMAIL_CREDENTIALS_PATH", "./context/gmail-credentials.json"))
+    return _gmail_handler
+
+def get_whatsapp_handler() -> WhatsAppHandler:
+    global _whatsapp_handler
+    if _whatsapp_handler is None:
+        _whatsapp_handler = WhatsAppHandler()
+    return _whatsapp_handler
 
 
 # --- Lifespan (modern FastAPI pattern, replaces deprecated on_event) ---
@@ -85,6 +98,7 @@ async def gmail_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     try:
         data = await request.json()
+        gmail_handler = get_gmail_handler()
         messages = await gmail_handler.process_notification(data)
         
         for msg_meta in messages:
@@ -102,6 +116,7 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     Receives inbound messages from Twilio.
     """
     try:
+        whatsapp_handler = get_whatsapp_handler()
         if not await whatsapp_handler.validate_webhook(request):
             raise HTTPException(status_code=403, detail="Invalid Twilio signature")
             

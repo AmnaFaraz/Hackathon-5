@@ -16,51 +16,49 @@ from email.mime.multipart import MIMEMultipart
 logger = logging.getLogger(__name__)
 
 
-def _try_build_service():
+def _build_service():
     """
-    Attempt to build a real Gmail API service from env-var credentials.
-    Returns None if credentials are not available or invalid.
+    Build a real Gmail API service from env-var credentials.
+    Raises ValueError if credentials are not configured.
     """
     credentials_json = os.getenv("GMAIL_CREDENTIALS_JSON", "")
     credentials_path = os.getenv("GMAIL_CREDENTIALS_PATH", "")
 
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    creds_data = None
+
+    # Priority 1: JSON string in env var (for cloud deployments)
+    if credentials_json and credentials_json.strip().startswith("{"):
+        creds_data = json.loads(credentials_json)
+
+    # Priority 2: File path (for local dev)
+    elif credentials_path and os.path.exists(credentials_path):
+        with open(credentials_path, "r") as f:
+            creds_data = json.load(f)
+
+    if not creds_data:
+        raise ValueError(
+            "Gmail credentials not configured! Please set either "
+            "GMAIL_CREDENTIALS_JSON or GMAIL_CREDENTIALS_PATH."
+        )
+
     try:
-        from google.oauth2.credentials import Credentials
-        from googleapiclient.discovery import build
-
-        creds_data = None
-
-        # Priority 1: JSON string in env var (for cloud deployments)
-        if credentials_json and credentials_json.strip().startswith("{"):
-            creds_data = json.loads(credentials_json)
-
-        # Priority 2: File path (for local dev)
-        elif credentials_path and os.path.exists(credentials_path):
-            with open(credentials_path, "r") as f:
-                creds_data = json.load(f)
-
-        if creds_data:
-            creds = Credentials.from_authorized_user_info(creds_data)
-            service = build("gmail", "v1", credentials=creds)
-            logger.info("Real GmailHandler initialized via Google API")
-            return service
-
+        creds = Credentials.from_authorized_user_info(creds_data)
+        service = build("gmail", "v1", credentials=creds)
+        logger.info("Real GmailHandler initialized via Google API")
+        return service
     except Exception as e:
-        logger.warning(f"Gmail API init failed — falling back to mock mode: {e}")
-
-    return None
+        logger.error(f"Gmail API init failed: {e}")
+        raise
 
 
 class GmailHandler:
     def __init__(self, credentials_path: str = None):
-        self.service = _try_build_service()
-        self._mock = self.service is None
-        if self._mock:
-            logger.info("GmailHandler running in mock mode (no valid credentials)")
+        self.service = _build_service()
 
     async def setup_push_notifications(self, topic_name: str) -> dict:
-        if self._mock:
-            return {"status": "mocked", "topicName": topic_name}
         try:
             body = {"labelIds": ["INBOX"], "topicName": topic_name}
             result = self.service.users().watch(userId="me", body=body).execute()
@@ -71,8 +69,6 @@ class GmailHandler:
 
     async def process_notification(self, pubsub_message: dict) -> list:
         """Process a Gmail Pub/Sub notification, returns list of message metadata."""
-        if self._mock:
-            return []
         try:
             msg_data = pubsub_message.get("message", {}).get("data", "")
             if msg_data:
@@ -97,8 +93,6 @@ class GmailHandler:
 
     async def get_message(self, message_id: str) -> dict:
         """Fetch a full Gmail message by ID, returns parsed dict."""
-        if self._mock:
-            return {}
         try:
             msg = (
                 self.service.users()
@@ -127,9 +121,6 @@ class GmailHandler:
         self, to_email: str, subject: str, body: str, thread_id: str = None
     ) -> dict:
         """Send an email reply to a customer."""
-        if self._mock:
-            logger.info(f"[MOCK] Gmail send to {to_email}: {subject}")
-            return {"channel_message_id": "mock-id", "delivery_status": "sent"}
         try:
             msg = MIMEMultipart("alternative")
             msg["To"] = to_email

@@ -3,22 +3,30 @@ from pydantic import ValidationError
 from production.channels.whatsapp_handler import WhatsAppHandler
 from production.channels.web_form_handler import SupportFormSubmission
 
+from unittest.mock import patch, MagicMock
+
 class TestWhatsAppHandler:
-    def test_format_response_short(self):
+    @patch("production.channels.whatsapp_handler._init_twilio")
+    def test_format_response_short(self, mock_init):
+        mock_init.return_value = (MagicMock(), MagicMock())
         handler = WhatsAppHandler()
         result = handler.format_response("Hello", 1600)
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0] == "Hello"
 
-    def test_format_response_splits_long(self):
+    @patch("production.channels.whatsapp_handler._init_twilio")
+    def test_format_response_splits_long(self, mock_init):
+        mock_init.return_value = (MagicMock(), MagicMock())
         handler = WhatsAppHandler()
         long_text = "word. " * 200 # approx 1200 chars
         result = handler.format_response(long_text, 100)
         assert len(result) > 1
 
     @pytest.mark.asyncio
-    async def test_process_webhook_extracts_phone(self):
+    @patch("production.channels.whatsapp_handler._init_twilio")
+    async def test_process_webhook_extracts_phone(self, mock_init):
+        mock_init.return_value = (MagicMock(), MagicMock())
         handler = WhatsAppHandler()
         form_data = {
             "From": "whatsapp:+923001234567",

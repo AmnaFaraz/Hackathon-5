@@ -9,10 +9,24 @@ def unique_email(prefix: str = "test") -> str:
     return f"{prefix}-{uuid.uuid4().hex[:8]}@example.com"
 
 
+from unittest.mock import patch, MagicMock, AsyncMock
+from production.api.main import app
+
 @pytest.fixture
 async def client():
-    async with AsyncClient(base_url="http://localhost:8000", timeout=30.0) as ac:
-        yield ac
+    # Mock Twilio, Gmail, and Kafka client initialization so the ASGI app starts cleanly
+    with patch("production.channels.whatsapp_handler._init_twilio") as mock_twilio, \
+         patch("production.channels.gmail_handler._build_service") as mock_gmail, \
+         patch("production.kafka_client.FTEKafkaProducer.start", new_callable=AsyncMock) as mock_k_start, \
+         patch("production.kafka_client.FTEKafkaProducer.stop", new_callable=AsyncMock) as mock_k_stop, \
+         patch("production.kafka_client.FTEKafkaProducer.publish", new_callable=AsyncMock) as mock_k_pub:
+         
+        mock_twilio.return_value = (MagicMock(), MagicMock())
+        mock_gmail.return_value = MagicMock()
+        
+        import httpx
+        async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", timeout=30.0) as ac:
+            yield ac
 
 class TestWebFormChannel:
     @pytest.mark.asyncio

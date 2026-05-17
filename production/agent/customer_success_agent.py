@@ -17,9 +17,12 @@ def _get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
         api_key = os.getenv("OPENAI_API_KEY", "")
-        if not api_key or api_key.startswith("sk-placeholder"):
-            logger.warning("OPENAI_API_KEY not set — AI responses will use fallback mode")
-        _client = AsyncOpenAI(api_key=api_key or "sk-missing")
+        if not api_key or api_key.startswith("sk-placeholder") or api_key == "sk-missing":
+            raise ValueError(
+                "OPENAI_API_KEY is not configured! Please configure a valid OpenAI API key "
+                "to run the Customer Success AI Agent in production."
+            )
+        _client = AsyncOpenAI(api_key=api_key)
     return _client
 
 

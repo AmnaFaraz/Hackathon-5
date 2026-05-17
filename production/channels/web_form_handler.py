@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator
-from production.kafka_mock import FTEKafkaProducer, TOPICS
+from production.kafka_client import FTEKafkaProducer, TOPICS
 from production.database import queries
 
 # Setup logging
